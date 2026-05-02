@@ -1,0 +1,12 @@
+data/
+report_figures/
+run_logs/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.mp4
+*.gif
+*.avi
+.DS_Store
+.venv/
