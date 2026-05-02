@@ -305,9 +305,16 @@ class SoftActorCritic(nn.Module):
         assert log_probs.shape == q_values.shape
 
         # TODO(student): Compute policy gradient using log-probs and Q-values
-        loss = -(log_probs * q_values.detach()).mean()
+        reinforce_targets = q_values.detach()
+        entropy = -log_probs
+        if self.use_entropy_bonus:
+            # For score-function gradients, include entropy regularization
+            # inside the sampled target rather than as a separate direct term.
+            reinforce_targets = reinforce_targets + self.temperature * entropy.detach()
 
-        return loss, (-log_probs).mean()
+        loss = -(log_probs * reinforce_targets).mean()
+
+        return loss, entropy.mean()
 
     def actor_loss_reparametrize(self, obs: torch.Tensor):
         batch_size = obs.shape[0]
@@ -339,16 +346,14 @@ class SoftActorCritic(nn.Module):
 
         if self.actor_gradient_type == "reparametrize":
             loss, entropy = self.actor_loss_reparametrize(obs)
+            if self.use_entropy_bonus:
+                loss -= self.temperature * entropy
         elif self.actor_gradient_type == "reinforce":
             loss, entropy = self.actor_loss_reinforce(obs)
         else:
             raise ValueError(
                 f"update_actor should not be called for actor_gradient_type={self.actor_gradient_type}"
             )
-
-        # Add entropy if necessary
-        if self.use_entropy_bonus:
-            loss -= self.temperature * entropy
 
         self.actor_optimizer.zero_grad()
         loss.backward()
